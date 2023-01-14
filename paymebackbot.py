@@ -80,18 +80,41 @@ def create_session(update, context):
         transactions_info = db.transactions_info
         group_info = transactions_info.find_one({'group_id':group_id})
         if group_info == None:
-            transactions = []
-            members = [user_id]
+            transactions_list = []
+            members_list = [user_id]
             group_details = {
                 'group_id':group_id,
-                'members': members,
-                'transaction_details':transactions
+                'members': members_list,
+                'transaction_details':transactions_list
             }
             transactions_info.update_one({'group_id':group_id}, {'$set':group_details}, upsert=True)
-            context.bot.send_message(group_id, text="Session started! Use /add_debts to add debts owed.")
+            context.bot.send_message(group_id, text="Session started by "+ name +  "! Other members please use /join to join the session.")
         else: 
             context.bot.send_message(group_id, text="There is already an active session!")
-        
+
+def join(update,context):
+    chat_type = update.message.chat.type
+    group_id = update.message.chat.id
+    user_id = update.message.from_user.id
+    name = update.message.from_user.first_name
+    
+    if chat_type == 'private':
+        update.message.reply_text('Please send all your commands in your group chat!')
+        return ConversationHandler.END
+
+    transactions_info = db.transactions_info
+    group_info = transactions_info.find_one({'group_id':group_id})
+    if group_info == None:
+        update.message.reply_text('There is currently no active session going on! Use /create_session to start a new one.')
+        return ConversationHandler.END
+    else:
+        members_list = group_info['members']
+        members_list.append(user_id)
+        group_details = {
+            'members': members_list
+        }
+        transactions_info.update_one({'group_id':group_id}, {'$set':group_details}, upsert=True)
+                
 def add_debts(update,context):
     chat_type = update.message.chat.type
     group_id = update.message.chat.id
@@ -113,6 +136,7 @@ def add_debts(update,context):
                             InlineKeyboardButton('People owe me', callback_data='People owe me')]]
                 reply_markup = InlineKeyboardMarkup(keyboard)    
                 context.bot.send_message(user_id,'Choose your mode:', reply_markup=reply_markup)
+                context.user_data['group_id'] = group_id
                 return CHOOSE_DEBT_MODE
 
         except Unauthorized:
@@ -125,8 +149,38 @@ def choose_debt_mode(update,context):
     query = update.callback_query
     user_id = query.from_user.id
     query.edit_message_text(text="Selected mode: {}".format(query.data))
-    group_id = context.user_data['group_train_start']        
-    context.bot_data[group_id]['mode'] = query.data
+    group_id = context.user_data['group_id'] 
+    if query.data == 'I owe people':
+        transactions_info = db.transactions_info
+        group_info = transactions_info.find_one({'group_id':group_id})
+        members_list = group_info['members']
+        keyboard = []
+        users_info = db.users_info
+        
+        for member_user_id in members_list: # in the form of user_id
+            user = users_info.find_one({'user_id':member_user_id})
+            name = user['name']
+            keyboard.append([InlineKeyboardButton(name, callback_data=member_user_id)])
+        # keyboard.append([InlineKeyboardButton('Cancel', callback_data='Cancel')])
+        reply_markup = InlineKeyboardMarkup(keyboard)  
+        context.bot.send_message(user_id,'Who do you owe $ to?', reply_markup=reply_markup)
+        return OWEDVALUE
+    elif query.data == 'People owe me':
+        pass
+
+def owed_value(update,context):
+    query = update.callback_query
+    user_id = query.from_user.id
+
+    creditor_info = users_info.find_one({'user_id':query.data})
+    creditor_name = creditor_info['name']
+    query.edit_message_text(text="Selected creditor: {}".format(creditor_name))
+    group_id = context.user_data['group_id']
+    context.user_data['creditor'] = query.data
+    context.bot.send_message(user_id,'How much do you owe?')
+    return ONETOONEFINAL
+
+
 
 def timeout(update, context):
     try:
