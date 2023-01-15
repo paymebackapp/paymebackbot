@@ -1,3 +1,4 @@
+import config
 import logging
 import datetime
 import time
@@ -16,8 +17,8 @@ logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s
 logger = logging.getLogger(__name__)
 from pymongo import MongoClient
 
-TOKEN =  '5896599202:AAHtcRjzImV87dKOBPcU53tFOlBkOxfu4-4'
-client = MongoClient("mongodb+srv://capoon:capoon@paymebackcluster0.pgoteoe.mongodb.net/?retryWrites=true&w=majority")
+TOKEN =  config.TOKEN
+client = MongoClient(config.client)
 db = client.get_database('payment_db')
 
 SEND_CONTACT, CHOOSE_DEBT_MODE, OWEDVALUE, ONETOONEFINAL, OWEALLFINAL = range(5)
@@ -379,8 +380,7 @@ def end_session(update,context):
     transactions_info = db.transactions_info
     group_info = transactions_info.find_one({'group_id':group_id})
     transactions_list = group_info['transaction_details']
-    # simplified_transactions = simplify_payments(transactions_list)
-    simplified_transactions = transactions_list
+    simplified_transactions = simplify_payments(transactions_list)
     if simplified_transactions != []:
         for transaction in simplified_transactions:
             receiver_id = transaction['receiver']
@@ -408,7 +408,7 @@ def end_session(update,context):
             reply_markup = InlineKeyboardMarkup(keyboard)    
             context.bot.send_message(payer_id, text="Please pay "+receiver_name+" $" + str(amount), reply_markup=reply_markup)
             context.bot.send_photo(payer_id, photo=open('generated_qr.png', 'rb'))
-            transactions_info.delete_one({'group_id':group_id})
+    transactions_info.delete_one({'group_id':group_id})
     context.bot.send_message(group_id, "Session ended!")
 
 def timeout(update, context):
