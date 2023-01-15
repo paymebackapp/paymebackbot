@@ -20,7 +20,7 @@ from pymongo import MongoClient
 TOKEN =  config.TOKEN
 client = MongoClient(config.client)
 db = client.get_database('payment_db')
-
+money_emoji = "\ud83d\udcb5"
 SEND_CONTACT, CHOOSE_DEBT_MODE, OWEDVALUE, ONETOONEFINAL, OWEALLFINAL = range(5)
 
 # Function to simplify unecessary payments. By ChatGPT
@@ -160,15 +160,15 @@ def start(update, context):
     username = update.message.from_user.username
     name = update.message.from_user.first_name
     
-    update.message.reply_text('Hi '+ name + ', welcome to <u><b>O$P$</b></u>! This bot makes keeping track of debts convenient and simple!'
+    update.message.reply_text('Hi '+ name + ', welcome to <u><b>O$P$</b></u>! ' + money_emoji + ' This bot makes keeping track of debts convenient and simple!'
                                 ' Send all your commands in <i>your own telegram group</i>.\n\n'
                                 '<b>List of commands:</b>\n'
                                 '/create_session - starts a new record in the group\n'
                                 '/end_session - ends the record and collate payments\n'
                                 '/cancel_session - cancels the record in the group\n'
-                                '/add_receipt - add a payment event\n'
-                                '/remove_receipt - deletes your existing payment\n'
-                                '/view_debts - checks the current list of payments', parse_mode=ParseMode.HTML)
+                                '/add_debts - add a payment event\n'
+                                '/remove_debts - deletes your existing payment\n'
+                                '/view_transactions - checks the current list of payments', parse_mode=ParseMode.HTML)
 
     keyboard=[[KeyboardButton(text="Send Contact", request_contact=True)]]
     reply_markup = ReplyKeyboardMarkup(keyboard)
@@ -248,6 +248,7 @@ def join(update,context):
             'members': members_list
         }
         transactions_info.update_one({'group_id':group_id}, {'$set':group_details}, upsert=True)
+        update.message.reply_text('Joined!')
                 
 def add_debts(update,context):
     chat_type = update.message.chat.type
@@ -293,7 +294,7 @@ def choose_debt_mode(update,context):
         
         for member_user_id in members_list: # in the form of user_id
             user = users_info.find_one({'user_id':member_user_id})
-            name = user['name']
+            name = user['name'] ###
             keyboard.append([InlineKeyboardButton(name, callback_data=member_user_id)])
         # keyboard.append([InlineKeyboardButton('Cancel', callback_data='Cancel')])
         reply_markup = InlineKeyboardMarkup(keyboard)  
@@ -428,6 +429,7 @@ def main():
     updater = Updater(TOKEN, use_context=True)
     dp = updater.dispatcher
     dp.add_handler(CommandHandler("create_session", create_session))
+    dp.add_handler(CommandHandler("join", join))
     dp.add_handler(CommandHandler("view_transactions", view_transactions))
     dp.add_handler(CommandHandler("end_session", end_session))
 
